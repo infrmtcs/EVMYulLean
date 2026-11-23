@@ -638,9 +638,13 @@ def processTests (tests : Array TestId) (isTimed : Option Nat := .none) :
   let mut discarded : Array TestId := .empty
   let mut results : Array (TestId × TestResult) := .empty
   let mut index := 0
+  let mut lastFile : Option (System.FilePath × Lean.Json) := .none
   for testId@(path, testName) in tests do
     index := index + 1
-    let file ← Lean.Json.fromFile path
+    let file ← match lastFile with
+      | .some (p, json) => if p == path then pure json else Lean.Json.fromFile path
+      | .none => Lean.Json.fromFile path
+    lastFile := .some (path, file)
     let test := Except.mapError Conform.Exception.CannotParse <| file.getObjValAs? TestEntry testName
     match test with
     | .error _ => IO.eprintln s!"Cannot parse: {testId}"
