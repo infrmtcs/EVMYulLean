@@ -121,18 +121,21 @@ def main (args : List String) : IO UInt32 := do
                           (directoryBlacklist := #["EthereumTests/BlockchainTests//GeneralStateTests/VMTests/vmPerformance"])
                           (testBlacklist := DelayFiles)
                           (phase := 1)
-                          (threads := NumThreads) >>= printResults
+                          (threads := NumThreads)
+                          (timed := true) >>= printResults
   
   IO.println s!"Phase 2/3 - Performance tests only."
   let failed₂ ← testFiles (root := "EthereumTests/BlockchainTests/GeneralStateTests/VMTests/vmPerformance/")
                           (phase := 2)
-                          (threads := NumThreads) >>= printResults
+                          (threads := NumThreads)
+                          (timed := true) >>= printResults
 
 
   IO.println s!"Phase 3/3 - Individually scheduled tests."
   let failed₃ ← testFiles (root := "EthereumTests/BlockchainTests/")
                           (testWhitelist := DelayFiles)
                           (phase := 3)
-                          (threads := NumThreads) >>= printResults
+                          (threads := NumThreads)
+                          (timed := true) >>= printResults
 
   return if (Std.HashSet.ofArray (failed₁ ++ failed₂ ++ failed₃) |>.diff ExpectedToFail).isEmpty then 0 else 1

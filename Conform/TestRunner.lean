@@ -611,12 +611,12 @@ instance (priority := high) : Repr (PersistentAccountMap .EVM) := ⟨λ m _ ↦
         result := result ++ s!"{sk} → {sv}\n"
     return result⟩
  
-def processTest (entry : TestEntry) (isTimed : Option (Nat × TestId) := .none) (verbose := true) : IO TestResult := do
+def processTest (entry : TestEntry) (isTimed : Option (Nat × Nat × Nat × TestId) := .none) (verbose := true) : IO TestResult := do
   let tα ← if isTimed.isSome then IO.monoMsNow else pure 0
   let result := preImpliesPost entry
   let tω ← if isTimed.isSome then IO.monoMsNow else pure 0
-  if let .some (thread, filepath, testname) := isTimed then
-    IO.eprint s!"#{if thread / 10 == 1 then "" else " "}{thread} "
+  if let .some (thread, index, total, filepath, testname) := isTimed then
+    IO.eprint s!"#{if thread / 10 == 1 then "" else " "}{thread} {index}/{total} {if result matches .ok .none then "\x1b[32mPASS" else "\x1b[31mFAIL"}\x1b[0m "
     IO.eprint s!"{testname} FROM {System.FilePath.mk (filepath.components.drop 3 |>.intersperse "/" |>.foldl (·++·) "")} "
     IO.eprintln s!"took: {(tω - tα).toFloat / 1000.0}s"
   pure <|
@@ -637,14 +637,16 @@ def processTests (tests : Array TestId) (isTimed : Option Nat := .none) :
                  IO (Array TestId × Array (TestId × TestResult)) := do
   let mut discarded : Array TestId := .empty
   let mut results : Array (TestId × TestResult) := .empty
+  let mut index := 0
   for testId@(path, testName) in tests do
+    index := index + 1
     let file ← Lean.Json.fromFile path
     let test := Except.mapError Conform.Exception.CannotParse <| file.getObjValAs? TestEntry testName
     match test with
     | .error _ => IO.eprintln s!"Cannot parse: {testId}"
                   discarded := discarded.push testId
     | .ok test => if test.network.startsWith "Cancun"
-                  then results := results.push (testId, ←processTest test <| isTimed <&> (·, testId))
+                  then results := results.push (testId, ←processTest test <| isTimed <&> (·, index, tests.size, testId))
   return (discarded, results)
 
 end Conform
