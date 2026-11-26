@@ -95,10 +95,25 @@ def fetchInstr (I : EvmYul.ExecutionEnv .EVM) (pc : UInt256) :
                Except EVM.ExecutionException (Operation .EVM × Option (UInt256 × Nat)) :=
   decode I.code pc |>.option (.error .StackUnderflow) Except.ok
 
-partial def D_J_aux (c : ByteArray) (i : UInt256) (result : Array UInt256) : Array UInt256 :=
-  match c.get? i.toNat >>= EvmYul.EVM.parseInstr with
+/--
+Stops where `N i cᵢ` wraps past `2^256`, so that the scan is total and proofs can unfold it.
+Only code longer than `2^256 - 33` bytes wraps.
+-/
+def D_J_aux (c : ByteArray) (i : UInt256) (result : Array UInt256) : Array UInt256 :=
+  match _h : c.get? i.toNat >>= EvmYul.EVM.parseInstr with
     | none => result
-    | some cᵢ => D_J_aux c (N i cᵢ) (if cᵢ = .JUMPDEST then result.push i else result)
+    | some cᵢ =>
+      let result := if cᵢ = .JUMPDEST then result.push i else result
+      if i < N i cᵢ
+      then D_J_aux c (N i cᵢ) result
+      else result
+termination_by c.size - i.toNat
+decreasing_by
+  have : i.toNat < c.size := by
+    unfold ByteArray.get? at _h
+    split at _h <;> simp_all
+  have : i.toNat < (N i cᵢ).toNat := by assumption
+  omega
 
 def D_J (c : ByteArray) (i : UInt256) : Array UInt256 :=
   D_J_aux c i #[]
